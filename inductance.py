@@ -15,6 +15,11 @@ interval_ranges = {  # Interval ranges for gradient calculation based on current
 }
 output_file = "inductance_vs_current.csv"  # Output file to save processed data
 
+# Physical constants
+N = 31  # Number of turns
+Ae = 188.3e-6  # Cross-sectional area in m^2
+flux_initial = 0  # Initial flux linkage in Weber
+
 # Define column names for the input CSV file
 time_column = "TIME"  # Column name for time
 current_column = "CH8"  # Column name for current
@@ -54,8 +59,8 @@ data = pd.read_csv(file_path, skiprows=skip_rows)
 # Rename the columns for clarity
 data.rename(columns={time_column: 'time', current_column: 'current', voltage_column: 'voltage'}, inplace=True)
 
-# Filter time values
-filtered_data = data[(data['time'] > time_min) & (data['time'] < time_max)]
+# Filter time values and explicitly create a copy
+filtered_data = data[(data['time'] > time_min) & (data['time'] < time_max)].copy()
 
 # Extract time, current, and voltage
 time = filtered_data['time'].values
@@ -86,32 +91,61 @@ for (min_current, max_current), interval in interval_ranges.items():
 # Avoid division by zero
 dI_dt[dI_dt == 0] = np.nan  # Replace zero with NaN to prevent division errors
 
-# Calculate inductance using the filtered voltage
-inductance = filtered_voltage / dI_dt
+# Calculate incremental inductance
+incremental_inductance = filtered_voltage / dI_dt
 
-# Add inductance vs current to the DataFrame
-filtered_data['inductance'] = inductance
+# Calculate flux linkage
+flux_linkage = np.cumsum(filtered_voltage) * np.mean(np.diff(time)) + flux_initial
 
-# Plot inductance vs current
+# Calculate secant inductance
+secant_inductance = flux_linkage / current
+secant_inductance[current == 0] = np.nan  # Avoid division by zero
+
+# Calculate magnetic co-energy
+magnetic_co_energy = np.cumsum(flux_linkage * np.gradient(current)) * np.mean(np.diff(time))
+
+# Calculate flux density
+flux_density = flux_linkage / (N * Ae)
+
+# Add calculated values to the DataFrame using .loc
+filtered_data.loc[:, 'incremental_inductance'] = incremental_inductance
+filtered_data.loc[:, 'secant_inductance'] = secant_inductance
+filtered_data.loc[:, 'flux_linkage'] = flux_linkage
+filtered_data.loc[:, 'magnetic_co_energy'] = magnetic_co_energy
+filtered_data.loc[:, 'flux_density'] = flux_density
+
+
+# Plotting incremental inductance vs current
 plt.figure()
-plt.plot(filtered_data['current'], filtered_data['inductance'], label="Inductance vs Current")
+plt.plot(filtered_data['current'], filtered_data['incremental_inductance'], label="Incremental Inductance")
 plt.xlabel("Current (A)")
 plt.ylabel("Inductance (H)")
-plt.title("Inductance vs Current")
+plt.title("Incremental Inductance vs Current")
 plt.grid()
 plt.legend()
 plt.show()
 
-# Plot current and both filtered and unfiltered voltage vs time
+# Plot the current, unfiltered voltage, and filtered voltage on the primary y-axis
 plt.figure()
-plt.plot(time, current, label="Current (A)", alpha=0.7)
-plt.plot(time, voltage, label="Unfiltered Voltage (V)", alpha=0.7)
-plt.plot(time, filtered_voltage, label="Filtered Voltage (V)", alpha=0.7, linestyle="--")
-plt.xlabel("Time (s)")
-plt.ylabel("Amplitude")
-plt.title("Current, Filtered, and Unfiltered Voltage vs Time")
-plt.grid()
-plt.legend()
+fig, ax1 = plt.subplots()
+ax1.plot(time, current, label="Current (A)", alpha=0.7)
+ax1.plot(time, voltage, label="Unfiltered Voltage (V)", alpha=0.7)
+ax1.plot(time, filtered_voltage, label="Filtered Voltage (V)", alpha=0.7, linestyle="--")
+ax1.set_xlabel("Time (s)")
+ax1.set_ylabel("Amplitude")
+ax1.legend(loc="upper left")
+ax1.grid()
+
+# Create a secondary y-axis for flux density
+ax2 = ax1.twinx()
+
+# Plot flux density on the secondary y-axis
+ax2.plot(time, flux_density, label="Flux Density (B)", color="purple", linestyle="--", alpha=0.7)
+ax2.set_ylabel("Flux Density (B)")
+ax2.legend(loc="lower right")
+
+# Set the title
+plt.title("Current, Filtered, and Unfiltered Voltage vs Time with Flux Density")
 plt.show()
 
 # Save the processed data

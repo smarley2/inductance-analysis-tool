@@ -16,5 +16,5 @@ This repository contains a Python script for analyzing and visualizing the induc
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/inductance-analysis-tool.git
+   git clone https://github.com/smarley2/inductance-analysis-tool.git
    cd inductance-analysis-tool

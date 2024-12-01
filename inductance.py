@@ -6,18 +6,19 @@ from scipy.signal import butter, filtfilt
 # User-configurable variables
 file_path = "example/Tek001_ALL.csv"  # Path to the CSV file
 skip_rows = 16  # Number of rows to skip in the CSV
-time_min = 0.5e-6  # Minimum time for filtering (in seconds)
-time_max = 120e-6  # Maximum time for filtering (in seconds)
+time_min = 0.5e-6  # Minimum time of csv data (in seconds)
+time_max = 120e-6  # Maximum time of csv data (in seconds)
 cutoff_frequency = 5e5  # Cutoff frequency for low-pass filter (in Hz)
 low_pass_filter_order = 4  # Order of the Butterworth low-pass filter
-inductance_min = 0  # Minimum inductance to be plotted (in H)
-inductance_max = 400e-6  # Maximum inductance to be plotted (in H)
 interval_ranges = {  # Interval ranges for gradient calculation based on current ranges
-#    (0, 10): 2000,      # Interval for current range 0 to 10 A
-#    (10, 30): 2000,     # Interval for current range 10 to 30 A
-    (0, np.inf): 2000 # Interval for current range 30 A to max
+    (0, np.inf): 2000  # Interval for current range 0 A to max
 }
 output_file = "inductance_vs_current.csv"  # Output file to save processed data
+
+# Define column names for the input CSV file
+time_column = "TIME"  # Column name for time
+current_column = "CH8"  # Column name for current
+voltage_column = "CH3"  # Column name for voltage
 
 # Define a low-pass Butterworth filter
 def low_pass_filter(data, cutoff, fs, order=4):
@@ -51,7 +52,7 @@ def custom_gradient(y, x, interval):
 data = pd.read_csv(file_path, skiprows=skip_rows)
 
 # Rename the columns for clarity
-data.rename(columns={'TIME': 'time', 'CH8': 'current', 'CH3': 'voltage'}, inplace=True)
+data.rename(columns={time_column: 'time', current_column: 'current', voltage_column: 'voltage'}, inplace=True)
 
 # Filter time values
 filtered_data = data[(data['time'] > time_min) & (data['time'] < time_max)]
@@ -91,15 +92,9 @@ inductance = filtered_voltage / dI_dt
 # Add inductance vs current to the DataFrame
 filtered_data['inductance'] = inductance
 
-# Filter data for the selected inductance range
-filtered_plot_data = filtered_data[
-    (filtered_data['inductance'] >= inductance_min) &
-    (filtered_data['inductance'] <= inductance_max)
-]
-
 # Plot inductance vs current
 plt.figure()
-plt.plot(filtered_plot_data['current'], filtered_plot_data['inductance'], label="Inductance vs Current")
+plt.plot(filtered_data['current'], filtered_data['inductance'], label="Inductance vs Current")
 plt.xlabel("Current (A)")
 plt.ylabel("Inductance (H)")
 plt.title("Inductance vs Current")
